@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8">
+    <title>Scrap mairies</title>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<style type="text/css">
+    h3 {
+        font-family: Verdana, Geneva, sans-serif; 
+        font-size: 16px; 
+        font-style: normal;
+    }
+</style>
+
+<body style="margin: 0px;">
+    <div style="display: flex; width: 100vw;flex-direction: column;padding: 50px;">
+        <h3 id="departments"></h3>
+        <h3 id="mairies" style="padding-left: 50px;"></h3>
+        <h3 id="errors"></h3>
+    </div>
+</body>
+
+<script>
+    let socket = io();
+
+    let departments = document.getElementById('departments');
+    let mairies = document.getElementById('mairies');
+    let errors = document.getElementById('errors');
+
+    socket.on('departments', function (msg) {
+        if (msg.length > 0)
+            departments.textContent = msg;
+    });
+
+    socket.on('mairies', function (msg) {
+        if (msg.length > 0)
+            mairies.textContent = msg;
+    });
+    
+    socket.on('errors', function (msg) {
+        if (msg.length > 0)
+            errors.textContent = msg;
+    });
+</script>
+
+</html>
