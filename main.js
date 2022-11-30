@@ -92,6 +92,7 @@ server.listen(8081, () => {
             departmentsIndex++;
 
             for (index in mairiesLinks) {
+                let errorOn = "";
                 try {
                     const mairieParameter = mairiesLinks[index];
                     const url = addressesUrl + mairieParameter;
@@ -102,18 +103,18 @@ server.listen(8081, () => {
                     );
 
                     const elusHtml = mairieHtml[0].match(elusRegex);
-                    const elusNameHtml = elusHtml[0].match(listRegex);
+                    const elusNameHtml = elusHtml ? elusHtml[0].match(listRegex): null;
 
                     const mairieNameHtml = mairieHtml[0].match(mairieRegex)[0];
-                    const mairie = mairieNameHtml.substring(4, mairieNameHtml.length - 5);
+                    const mairie = mairieNameHtml.length > 4 ? mairieNameHtml.substring(4, mairieNameHtml.length - 5): null;
 
                     const coordonneesHtml = mairieHtml[0].match(coordonneesRegex);
                     
-                    const mailHtml = coordonneesHtml[0].match(mailRegex);
-                    const mail = mailHtml[0].substring(8, mailHtml[0].length - 1);
+                    const mailHtml = coordonneesHtml ? coordonneesHtml[0].match(mailRegex): null;
+                    const mail = mailHtml && mailHtml.length > 8 ? mailHtml[0].substring(8, mailHtml[0].length - 1): null;
 
-                    const siteHtml = coordonneesHtml[0].match(siteRegex);
-                    const site = siteHtml[0].substring(8, siteHtml[0].length - 1);
+                    const siteHtml = coordonneesHtml ? coordonneesHtml[0].match(siteRegex): null;
+                    const site = siteHtml && siteHtml.length > 8 ? siteHtml[0].substring(8, siteHtml[0].length - 1): null;
 
                     const elus = [];
                     for (index in elusNameHtml) {
@@ -122,14 +123,15 @@ server.listen(8081, () => {
                         elus.push(elu);
                     }
                     mairieJson = {
-                        "name": mairie,
-                        "url" : url,
-                        "mail": mail,
-                        "site": site,
-                        "elus": elus
+                        "name": mairie ? mairie: "inconnu",
+                        "url" : url ? url: "inconnu",
+                        "mail": mail ? mail: "inconnu",
+                        "site": site ? site: "inconnu",
+                        "elus": elus ? elus:  []
                     }
                     mairiesJson.push(mairieJson)
                 } catch (error) {
+                    console.log(errorOn);
                     console.log(error);
                     errors++;
                 }
