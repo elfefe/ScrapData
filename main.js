@@ -38,7 +38,7 @@ const filterBadAddresses = (addresses) => {
     return links;
 };
 
-const progresses = {
+const progress = {
     "departments": {
         "max": 0,
         "current": 0
@@ -55,9 +55,9 @@ const progresses = {
 const mairiesJson = [];
 
 const sendData = () => {
-    io.emit('departments', "Departments: " + progresses["departments"]["current"] + "/" + progresses["departments"]["max"]);
-    io.emit('mairies', "Mairies: " + progresses["mairies"]["current"] + "/" + progresses["mairies"]["max"]);
-    io.emit('errors', "Failures: " + progresses["errors"]["current"]);
+    io.emit('departments', "Departments: " + progress["departments"]["current"] + "/" + progress["departments"]["max"]);
+    io.emit('mairies', "Mairies: " + progress["mairies"]["current"] + "/" + progress["mairies"]["max"]);
+    io.emit('errors', "Failures: " + progress["errors"]["current"]);
 };
 
 app.get('/', (req, res) => {
@@ -97,7 +97,7 @@ server.listen(8081, () => {
 
     const departmentsLinks = filterBadAddresses(departementsHrefs);
 
-    progresses["departments"]["max"] = departmentsLinks.length;
+    progress["departments"]["max"] = departmentsLinks.length;
 
     for (index in departmentsLinks) {
         try {
@@ -109,8 +109,9 @@ server.listen(8081, () => {
 
             const mairiesLinks = filterBadAddresses(mairiesHrefs);
 
-            progresses["mairies"]["max"] = mairiesLinks.length;
-            progresses["departments"]["current"]++;
+            progress["mairies"]["max"] = mairiesLinks.length;
+            progress["mairies"]["current"] = 0;
+            progress["departments"]["current"]++;
 
             for (index in mairiesLinks) {
                 try {
@@ -152,15 +153,15 @@ server.listen(8081, () => {
                     mairiesJson.push(mairieJson)
                 } catch (error) {
                     console.log(error);
-                    progresses["errors"]["current"]++;
+                    progress["errors"]["current"]++;
                 }
                 
-                progresses["mairies"]["current"]++;
+                progress["mairies"]["current"]++;
                 sendData();
             }
         } catch (error) {
             console.log(error);
-            progresses["errors"]["current"]++;
+            progress["errors"]["current"]++;
         }
     }
 })();
