@@ -20,7 +20,10 @@
         <h3 id="departments"></h3>
         <h3 id="mairies" style="padding-left: 50px;"></h3>
         <h3 id="errors"></h3>
-        <button id="save" style="width: 200px; height: 50px;">Save to file</button>
+        <div style="display: flex; direction: row;justify-content: space-between;width: 300px;">
+            <button id="start" style="width: 80px; height: 50px;">Start</button>
+            <button id="save" style="width: 150px; height: 50px;">Save to file</button>
+        </div>
     </div>
 </body>
 
@@ -34,6 +37,11 @@
     const save = document.getElementById('save');
     save.onclick = () => {
         socket.emit("download");
+    };
+    const start = document.getElementById('start');
+    start.onclick = () => {
+        socket.emit("start");
+        start.textContent = start.textContent == "Start" ? "Stop": "Start";
     };
 
     socket.on("download", msg => {

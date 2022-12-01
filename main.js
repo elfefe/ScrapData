@@ -48,11 +48,19 @@ const progress = {
         "current": 0
     },
     "errors": {
-        "current": 0
+        "current": 0,
+        "stacktrace": ""
     }
 }
 
+const position = {
+    "departments": 0,
+    "mairies": 0
+}
+
 const mairiesJson = [];
+
+let IS_STOPPED = true;
 
 const sendData = () => {
     io.emit('departments', "Departments: " + progress["departments"]["current"] + "/" + progress["departments"]["max"]);
@@ -67,9 +75,13 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
     console.log('a user connected');
     sendData();
-    socket.on("download", msg => {
+    socket.on("download", _ => {
         const mairies = JSON.stringify(mairiesJson, null, 4);
         socket.emit("download", mairies);
+    });
+    socket.on("start", _ => {
+        IS_STOPPED = !IS_STOPPED
+        start();
     });
 });
 
@@ -78,7 +90,8 @@ server.listen(8081, () => {
 });
 
 // Main
-(async () => {
+const start = async () => {
+    if (IS_STOPPED) return;
     const addressesUrl = "https://www.adresses-mairies.fr";
     const departmentsRegex = /href=(["'])\/departement-(.*?)\1/gm;
     const mairiesRegex = /href=(["'])\/mairie-(.*?)\1/gm;
@@ -98,10 +111,12 @@ server.listen(8081, () => {
     const departmentsLinks = filterBadAddresses(departementsHrefs);
 
     progress["departments"]["max"] = departmentsLinks.length;
+    progress["departments"]["current"] = position["departments"];
+    progress["mairies"]["current"] = position["mairies"];
 
-    for (index in departmentsLinks) {
+    for (;position["departments"] < progress["departments"]["max"];) {
         try {
-            const departmentParameter = departmentsLinks[index];
+            const departmentParameter = departmentsLinks[position["departments"]];
             const mairiesHrefs = await scrapData(
                 addressesUrl + departmentParameter,
                 mairiesRegex
@@ -110,12 +125,12 @@ server.listen(8081, () => {
             const mairiesLinks = filterBadAddresses(mairiesHrefs);
 
             progress["mairies"]["max"] = mairiesLinks.length;
-            progress["mairies"]["current"] = 0;
             progress["departments"]["current"]++;
 
-            for (index in mairiesLinks) {
+            for (;position["mairies"] < progress["mairies"]["max"];) {
+                if (IS_STOPPED) return;
                 try {
-                    const mairieParameter = mairiesLinks[index];
+                    const mairieParameter = mairiesLinks[position["mairies"]];
                     const url = addressesUrl + mairieParameter;
 
                     const mairieHtml = await scrapData(
@@ -153,16 +168,20 @@ server.listen(8081, () => {
                     mairiesJson.push(mairieJson)
                 } catch (error) {
                     console.log(error);
+                    progress["errors"]["stacktrace"] = error;
                     progress["errors"]["current"]++;
                 }
-                
+                position["mairies"]++;
                 progress["mairies"]["current"]++;
                 sendData();
             }
         } catch (error) {
             console.log(error);
+            progress["errors"]["stacktrace"] = error;
             progress["errors"]["current"]++;
         }
+        progress["mairies"]["current"] = 0;
+        position["departments"]++;
     }
-})();
+};
 
