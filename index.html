@@ -20,27 +20,43 @@
         <h3 id="departments"></h3>
         <h3 id="mairies" style="padding-left: 50px;"></h3>
         <h3 id="errors"></h3>
+        <button id="save" style="width: 200px; height: 50px;">Save to file</button>
     </div>
 </body>
 
 <script>
-    let socket = io();
+    const socket = io();
 
-    let departments = document.getElementById('departments');
-    let mairies = document.getElementById('mairies');
-    let errors = document.getElementById('errors');
+    const departments = document.getElementById('departments');
+    const mairies = document.getElementById('mairies');
+    const errors = document.getElementById('errors');
 
-    socket.on('departments', function (msg) {
+    const save = document.getElementById('save');
+    save.onclick = () => {
+        socket.emit("download");
+    };
+
+    socket.on("download", msg => {
+        const content = [msg];
+        const file = new Blob(content, { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(file);
+        a.download = "mairies.json";
+        a.click();
+        a.remove();
+    });
+
+    socket.on('departments', msg => {
         if (msg.length > 0)
             departments.textContent = msg;
     });
 
-    socket.on('mairies', function (msg) {
+    socket.on('mairies', msg => {
         if (msg.length > 0)
             mairies.textContent = msg;
     });
     
-    socket.on('errors', function (msg) {
+    socket.on('errors', msg => {
         if (msg.length > 0)
             errors.textContent = msg;
     });

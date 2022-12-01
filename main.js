@@ -1,5 +1,4 @@
 const https = require('https');
-const fs = require('fs');
 
 const express = require('express');
 const app = express();
@@ -39,12 +38,39 @@ const filterBadAddresses = (addresses) => {
     return links;
 };
 
+const progresses = {
+    "departments": {
+        "max": 0,
+        "current": 0
+    },
+    "mairies": {
+        "max": 0,
+        "current": 0
+    },
+    "errors": {
+        "current": 0
+    }
+}
+
+const mairiesJson = [];
+
+const sendData = () => {
+    io.emit('departments', "Departments: " + progresses["departments"]["current"] + "/" + progresses["departments"]["max"]);
+    io.emit('mairies', "Mairies: " + progresses["mairies"]["current"] + "/" + progresses["mairies"]["max"]);
+    io.emit('errors', "Failures: " + progresses["errors"]["current"]);
+};
+
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
 io.on('connection', (socket) => {
     console.log('a user connected');
+    sendData();
+    socket.on("download", msg => {
+        const mairies = JSON.stringify(mairiesJson, null, 4);
+        socket.emit("download", mairies);
+    });
 });
 
 server.listen(8081, () => {
@@ -64,8 +90,6 @@ server.listen(8081, () => {
     const mailRegex = /"mailto(.*?)"/gm;
     const siteRegex = /"http(.*?)"/gm;
 
-    const mairiesJson = [];
-
     const departementsHrefs = await scrapData(
         addressesUrl,
         departmentsRegex
@@ -73,9 +97,8 @@ server.listen(8081, () => {
 
     const departmentsLinks = filterBadAddresses(departementsHrefs);
 
-    const departmentsTotal = departmentsLinks.length;
-    let departmentsIndex = 0;
-    let errors = 0;
+    progresses["departments"]["max"] = departmentsLinks.length;
+
     for (index in departmentsLinks) {
         try {
             const departmentParameter = departmentsLinks[index];
@@ -86,13 +109,10 @@ server.listen(8081, () => {
 
             const mairiesLinks = filterBadAddresses(mairiesHrefs);
 
-            const mairiesTotal = mairiesLinks.length;
-            let mairiesIndex = 0;
-
-            departmentsIndex++;
+            progresses["mairies"]["max"] = mairiesLinks.length;
+            progresses["departments"]["current"]++;
 
             for (index in mairiesLinks) {
-                let errorOn = "";
                 try {
                     const mairieParameter = mairiesLinks[index];
                     const url = addressesUrl + mairieParameter;
@@ -111,10 +131,10 @@ server.listen(8081, () => {
                     const coordonneesHtml = mairieHtml[0].match(coordonneesRegex);
                     
                     const mailHtml = coordonneesHtml ? coordonneesHtml[0].match(mailRegex): null;
-                    const mail = mailHtml && mailHtml.length > 8 ? mailHtml[0].substring(8, mailHtml[0].length - 1): null;
+                    const mail = mailHtml && mailHtml.length > 0 ? mailHtml[0].substring(8, mailHtml[0].length - 1): null;
 
                     const siteHtml = coordonneesHtml ? coordonneesHtml[0].match(siteRegex): null;
-                    const site = siteHtml && siteHtml.length > 8 ? siteHtml[0].substring(8, siteHtml[0].length - 1): null;
+                    const site = siteHtml && siteHtml.length > 0 ? siteHtml[0].substring(8, siteHtml[0].length - 1): null;
 
                     const elus = [];
                     for (index in elusNameHtml) {
@@ -131,21 +151,17 @@ server.listen(8081, () => {
                     }
                     mairiesJson.push(mairieJson)
                 } catch (error) {
-                    console.log(errorOn);
                     console.log(error);
-                    errors++;
+                    progresses["errors"]["current"]++;
                 }
-
-                io.emit('departments', "Departments: " + departmentsIndex + "/" + departmentsTotal);
-                io.emit('mairies', "Mairies: " + ++mairiesIndex + "/" + mairiesTotal);
-                io.emit('errors', "Failures: " + errors);
+                
+                progresses["mairies"]["current"]++;
+                sendData();
             }
         } catch (error) {
             console.log(error);
-            errors++;
+            progresses["errors"]["current"]++;
         }
     }
-
-    fs.writeFileSync("mairies.json", JSON.stringify(mairiesJson, null, 4));
 })();
 
