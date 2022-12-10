@@ -1,7 +1,6 @@
 {
-  "name": "scrap-mairies",
+  "name": "scrap-data",
   "version": "1.0.0",
-  "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -14,5 +13,14 @@
     "fs": "^0.0.1-security",
     "http": "^0.0.1-security",
     "socket.io": "^4.5.4"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elfefe/ScrapData.git"
+  },
+  "bugs": {
+    "url": "https://github.com/elfefe/ScrapData/issues"
+  },
+  "homepage": "https://github.com/elfefe/ScrapData#readme",
+  "description": ""
 }
