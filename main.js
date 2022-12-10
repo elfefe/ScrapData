@@ -22,25 +22,13 @@ const progress = {
     }
 }
 
-progress[UPDATE] = () => sendData({
-    "departments": "Departments: " + progress["departments"]["current"] + "/" + progress["departments"]["max"],
-    "mairies": "Mairies: " + progress["mairies"]["current"] + "/" + progress["mairies"]["max"],
-    "errors": "Failures: " + progress["errors"]["current"]
-});
-
-progress[RESTART] = () => {
+const restartProgress = () => {
     progress["departments"]["current"] = 0;
     progress["departments"]["max"] = 0;
-    progress["Mairies"]["current"] = 0;
-    progress["Mairies"]["max"] = 0;
+    progress["mairies"]["current"] = 0;
+    progress["mairies"]["max"] = 0;
     progress["errors"]["current"] = 0;
-    progress["Mairies"]["stacktrace"] = "";
-};
-
-const sendData = (docs) => {
-    for(doc in docs) {
-        io.emit(doc, docs[doc])
-    }
+    progress["mairies"]["stacktrace"] = "";
 };
 
 const mairiesJson = [];
@@ -49,7 +37,7 @@ let isStopped = true;
 const updateStopped = () => isStopped = !isStopped;
 
 io.on(CONNECTION, socket => {
-    progress[UPDATE]();
+    socket.emit(UPDATE, progress);
     socket.on(START, _ => {
         updateStopped();
         start().catch(error => {
@@ -60,9 +48,7 @@ io.on(CONNECTION, socket => {
         const mairies = JSON.stringify(mairiesJson, null, 4);
         socket.emit(DOWNLOAD, mairies);
     });
-    socket.on(RESTART, _ => {
-        progress[RESTART]();
-    });
+    socket.on(RESTART, _ => restartProgress());
 });
 
 
@@ -88,8 +74,10 @@ const start = async () => {
     const departmentsLinks = filterBadAddresses(departementsHrefs);
 
     progress["departments"]["max"] = departmentsLinks.length;
+    progress["departments"]["current"] = 1;
+    progress["mairies"]["current"] = 1;
 
-    for (;progress["departments"]["current"] < progress["departments"]["max"];) {
+    for (;progress["departments"]["current"] <= progress["departments"]["max"];) {
         try {
             const departmentParameter = departmentsLinks[progress["departments"]["current"]];
             const mairiesHrefs = await scrapData(
@@ -101,7 +89,7 @@ const start = async () => {
 
             progress["mairies"]["max"] = mairiesLinks.length;
 
-            for (;progress["mairies"]["current"] < progress["mairies"]["max"];) {
+            for (;progress["mairies"]["current"] <= progress["mairies"]["max"];) {
                 if (isStopped) return;
                 try {
                     const mairieParameter = mairiesLinks[progress["mairies"]["current"]];
@@ -146,7 +134,7 @@ const start = async () => {
                     progress["errors"]["current"]++;
                 }
                 progress["mairies"]["current"]++;
-                progress[UPDATE]();
+                io.emit(UPDATE, progress);
             }
         } catch (error) {
             console.log(error);

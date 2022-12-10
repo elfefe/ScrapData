@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8">
+    <title>Scrap mairies</title>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<style type="text/css">
+    h3 {
+        font-family: Verdana, Geneva, sans-serif; 
+        font-size: 16px; 
+        font-style: normal;
+    }
+</style>
+
+<body style="margin: 0px;">
+    <div style="display: flex; width: 100vw;flex-direction: column;padding: 50px;">
+        <h3 id="departments"></h3>
+        <h3 id="mairies" style="padding-left: 50px;"></h3>
+        <h3 id="errors"></h3>
+        <div style="display: flex; direction: row;justify-content: space-between;width: 300px;">
+            <button id="start" style="width: 80px; height: 50px;">Start</button>
+            <button id="save" style="width: 150px; height: 50px;">Save to file</button>
+        </div>
+    </div>
+</body>
+
+<script type='text/javascript'>
+
+const socket = io();
+
+const departments = document.getElementById('departments');
+const mairies = document.getElementById('mairies');
+const errors = document.getElementById('errors');
+
+const save = document.getElementById('save');
+save.onclick = () => {
+    socket.emit("download");
+};
+const start = document.getElementById('start');
+start.onclick = () => {
+    socket.emit("start");
+    start.textContent = start.textContent == "Start" ? "Stop": "Start";
+};
+
+socket.on("download", msg => {
+    const content = [msg];
+    const file = new Blob(content, { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(file);
+    a.download = "mairies.json";
+    a.click();
+    a.remove();
+});
+
+socket.on('departments', msg => {
+    if (msg.length > 0)
+    departments.textContent = msg;
+});
+
+socket.on('mairies', msg => {
+    if (msg.length > 0)
+    mairies.textContent = msg;
+});
+
+socket.on('errors', msg => {
+    if (msg.length > 0)
+    errors.textContent = msg;
+});
+</script>
+
+</html>
