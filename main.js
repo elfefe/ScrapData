@@ -1,11 +1,13 @@
-const { scrapData, filterBadAddresses } = require("./scrap");
+const { scrapData } = require("./scrap");
 const { io } = require("./io");
 
 const UPDATE = "update";
+const GET = "get";
 const RESTART = "restart";
 const CONNECTION = "connection";
 const START = "start";
 const DOWNLOAD = "download";
+
 
 const progress = {
     "departments": {
@@ -22,6 +24,15 @@ const progress = {
     }
 }
 
+const dataType = (type, value) => {
+    return {
+        "type": type,
+        "value": value
+    }
+};
+
+const departmentsJson = {};
+
 const restartProgress = () => {
     progress["departments"]["current"] = 0;
     progress["departments"]["max"] = 0;
@@ -31,37 +42,39 @@ const restartProgress = () => {
     progress["mairies"]["stacktrace"] = "";
 };
 
-const mairiesJson = [];
-
 let isStopped = true;
 const updateStopped = () => isStopped = !isStopped;
 
 io.on(CONNECTION, socket => {
-    socket.emit(UPDATE, progress);
-    socket.on(START, _ => {
+    socket.emit(UPDATE, dataType("progress", progress));
+    socket.emit(UPDATE, dataType("data", dataType("departments", Object.keys(departmentsJson))));
+    socket.on(START, url => {
         updateStopped();
-        start().catch(error => {
+        start(url).catch(error => {
             console.log(error);
         });
     });
     socket.on(DOWNLOAD, _ => {
-        const mairies = JSON.stringify(mairiesJson, null, 4);
-        socket.emit(DOWNLOAD, mairies);
+        const departments = JSON.stringify(departmentsJson, null, 4);
+        socket.emit(DOWNLOAD, departments);
+    });
+    socket.on(GET, msg => {
+        socket.emit(UPDATE, dataType("data", dataType("mairies", departmentsJson[msg])));
     });
     socket.on(RESTART, _ => restartProgress());
 });
 
 
 // Main
-const start = async () => {
+const start = async (addressesUrl) => {
     if (isStopped) return;
-    const addressesUrl = "https://www.adresses-mairies.fr";
-    const departmentsRegex = /href=(["'])\/departement-(.*?)\1/gm;
-    const mairiesRegex = /href=(["'])\/mairie-(.*?)\1/gm;
+    const departmentsRegex = /href="(\/departement-.*?)" title="(.*?)"/g;
+    const departmentRegex = /href="(\/departement-.*?)" title="(.*?)"/;
+    const mairiesRegex = /href="(\/mairie-.*?)" title="(.*?)"/g;
+    const mairieRegex = /href="(\/mairie-.*?)" title="(.*?)"/;
     const allRegex = /[^]*/gm;
     const elusRegex = /<ul class="liste_elus">.*<\/ul>/gm;
     const listRegex = /<li>([^<]*)<\/li>/gm;
-    const mairieRegex = /<h2>Maire.*<\/h2>/gm;
     const coordonneesRegex = /<ul class="coordonnees">.*<\/ul>/gm
     const mailRegex = /"mailto(.*?)"/gm;
     const siteRegex = /"http(.*?)"/gm;
@@ -71,48 +84,50 @@ const start = async () => {
         departmentsRegex
     );
 
-    const departmentsLinks = filterBadAddresses(departementsHrefs);
-
-    progress["departments"]["max"] = departmentsLinks.length;
+    progress["departments"]["max"] = departementsHrefs.length;
     progress["departments"]["current"] = 1;
     progress["mairies"]["current"] = 1;
 
-    for (;progress["departments"]["current"] <= progress["departments"]["max"];) {
+    for (; progress["departments"]["current"] <= progress["departments"]["max"];) {
         try {
-            const departmentParameter = departmentsLinks[progress["departments"]["current"]];
+            const departmentParts = departementsHrefs[progress["departments"]["current"]].match(departmentRegex);
+            if (departmentParts.length < 3) break;
+            const departmentParameter = departmentParts[1];
+            const departmentName = departmentParts[2];
+
             const mairiesHrefs = await scrapData(
                 addressesUrl + departmentParameter,
                 mairiesRegex
             );
 
-            const mairiesLinks = filterBadAddresses(mairiesHrefs);
+            progress["mairies"]["max"] = mairiesHrefs.length;
 
-            progress["mairies"]["max"] = mairiesLinks.length;
+            departmentsJson[departmentName] = [];
 
-            for (;progress["mairies"]["current"] <= progress["mairies"]["max"];) {
+            io.emit(UPDATE, dataType("data", dataType("departments", Object.keys(departmentsJson))));
+
+            for (; progress["mairies"]["current"] <= progress["mairies"]["max"];) {
                 if (isStopped) return;
                 try {
-                    const mairieParameter = mairiesLinks[progress["mairies"]["current"]];
+                    const mairieParts = mairiesHrefs[progress["mairies"]["current"]].match(mairieRegex);
+                    if (mairieParts.length < 3) break;
+                    const mairieParameter = mairieParts[1];
+                    const mairieName = mairieParts[2];
+
                     const url = addressesUrl + mairieParameter;
 
-                    const mairieHtml = await scrapData(
-                        url,
-                        allRegex
-                    );
+                    const mairieHtml = await scrapData(url, allRegex);
 
                     const elusHtml = mairieHtml[0].match(elusRegex);
-                    const elusNameHtml = elusHtml ? elusHtml[0].match(listRegex): null;
-
-                    const mairieNameHtml = mairieHtml[0].match(mairieRegex)[0];
-                    const mairie = mairieNameHtml.length > 4 ? mairieNameHtml.substring(4, mairieNameHtml.length - 5): null;
+                    const elusNameHtml = elusHtml ? elusHtml[0].match(listRegex) : null;
 
                     const coordonneesHtml = mairieHtml[0].match(coordonneesRegex);
-                    
-                    const mailHtml = coordonneesHtml ? coordonneesHtml[0].match(mailRegex): null;
-                    const mail = mailHtml && mailHtml.length > 0 ? mailHtml[0].substring(8, mailHtml[0].length - 1): null;
 
-                    const siteHtml = coordonneesHtml ? coordonneesHtml[0].match(siteRegex): null;
-                    const site = siteHtml && siteHtml.length > 0 ? siteHtml[0].substring(8, siteHtml[0].length - 1): null;
+                    const mailHtml = coordonneesHtml ? coordonneesHtml[0].match(mailRegex) : null;
+                    const mail = mailHtml && mailHtml.length > 0 ? mailHtml[0].substring(8, mailHtml[0].length - 1) : null;
+
+                    const siteHtml = coordonneesHtml ? coordonneesHtml[0].match(siteRegex) : null;
+                    const site = siteHtml && siteHtml.length > 0 ? siteHtml[0].substring(8, siteHtml[0].length - 1) : null;
 
                     const elus = [];
                     for (const index in elusNameHtml) {
@@ -121,20 +136,20 @@ const start = async () => {
                         elus.push(elu);
                     }
                     const mairieJson = {
-                        "name": mairie ? mairie: "inconnu",
-                        "url" : url ? url: "inconnu",
-                        "mail": mail ? mail: "inconnu",
-                        "site": site ? site: "inconnu",
-                        "elus": elus ? elus:  []
+                        "name": mairieName ? mairieName : "inconnu",
+                        "url": url ? url : "inconnu",
+                        "mail": mail ? mail : "inconnu",
+                        "site": site ? site : "inconnu",
+                        "elus": elus ? elus : []
                     }
-                    mairiesJson.push(mairieJson)
+                    departmentsJson[departmentName].push(mairieJson)
                 } catch (error) {
                     console.log(error);
                     progress["errors"]["stacktrace"] = error;
                     progress["errors"]["current"]++;
                 }
                 progress["mairies"]["current"]++;
-                io.emit(UPDATE, progress);
+                io.emit(UPDATE, dataType("progress", progress));
             }
         } catch (error) {
             console.log(error);

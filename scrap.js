@@ -2,7 +2,7 @@ const https = require('https');
 
 module.exports.scrapData = (url, regex) => new Promise(resolve => {
     let request = https.request(url, res => {
-        var data = '';
+        let data = '';
         res.on('data', (chunk) => {
             data += chunk;
         });
@@ -20,13 +20,3 @@ module.exports.scrapData = (url, regex) => new Promise(resolve => {
 
     request.end();
 });
-
-module.exports.filterBadAddresses = (addresses) => {
-    const links = [];
-    for (index in addresses) {
-        address = addresses[index];
-        if (!address.includes("https") && address.length > 8)
-            links.push(address.substring(6, address.length - 1));
-    }
-    return links;
-};
